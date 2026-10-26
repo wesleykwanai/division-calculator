@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>直式除法練習及測驗</title>
+<style>
+body{font-family:sans-serif;background:#eef2ff;margin:0;padding:16px;color:#1e293b}
+.box{max-width:900px;margin:auto;background:#fff;border-radius:16px;padding:20px;box-shadow:0 4px 20px rgba(0,0,0,.1);position:relative}
+.tabs{position:absolute;top:14px;right:14px;display:flex;gap:6px}
+.tabs button{padding:6px 14px;font-size:1rem}
+h1{text-align:center;color:#312e81}
+.row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:12px 0;align-items:center}
+input[type=number]{font-size:1.2rem;padding:8px;width:140px;text-align:center;border:2px solid #c7d2fe;border-radius:8px}
+select{font-size:1.1rem;padding:6px;border:2px solid #c7d2fe;border-radius:8px}
+button{font-size:1.1rem;padding:8px 20px;border-radius:10px;border:none;background:#4f46e5;color:#fff;cursor:pointer;font-weight:bold}
+button.ghost{background:#e0e7ff;color:#3730a3}
+button:disabled{background:#cbd5e1;cursor:default}
+#mwrap{display:none;margin-top:10px;text-align:center}
+#mwrap.show{display:block}
+#mwrap table{margin:6px auto;font-size:1.5rem}
+#mwrap td{padding:8px 18px;font-size:1.5rem}
+#suggest{font-size:1.2rem;font-weight:bold;color:#92400e;background:#fef9c3;border-radius:8px;padding:8px;margin-top:6px}
+#grid{display:grid;gap:0;font-family:monospace;font-size:1.6rem;margin:20px auto;width:max-content;max-width:100%;overflow-x:auto;scrollbar-width:none}
+#grid::-webkit-scrollbar{display:none}
+.cell{width:40px;height:50px;display:flex;align-items:center;justify-content:center;position:relative}
+.bcol{width:24px}
+.top{border-top:2px solid #0f172a}
+.uline{border-bottom:2px solid #334155}
+.digit{width:32px;height:40px;text-align:center;font-size:1.5rem;border-radius:6px;border:1px solid #cbd5e1;background:#fff;outline:none;font-family:monospace}
+.digit.ok{color:#15803d;background:#f0fdf4;border-color:#bbf7d0;font-weight:bold}
+.digit.bad{color:#dc2626;background:#fef2f2;border-color:#fecaca}
+.digit.active{background:#eef2ff;border:2px solid #6366f1}
+.digit:disabled{background:#fff;opacity:1}
+.hint{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+table{border-collapse:collapse}
+td{border:1px solid #e2e8f0;padding:4px 10px;font-family:monospace}
+tr.hl td{background:#fef9c3;font-weight:bold}
+.msg{text-align:center;font-weight:bold;min-height:1.5em}
+.scorebar{display:flex;gap:12px;justify-content:center;font-weight:bold}
+.pill{background:#e0e7ff;border-radius:999px;padding:4px 16px}
+#nextBtn{display:none}
+#nextBtn.show{display:inline-block;animation:bounce .8s infinite alternate}
+@keyframes bounce{from{transform:translateY(0)}to{transform:translateY(-6px)}}
+@keyframes drop{0%{transform:translateY(-24px);opacity:0}60%{transform:translateY(4px);opacity:1}100%{transform:none;opacity:1}}
+.drop{display:inline-block;animation:drop .6s ease;background:#fef9c3;border-radius:8px;padding:0 6px}
+.bauto{border:1px dashed #cbd5e1;border-radius:8px;min-width:32px;min-height:40px}
+.okmsg{color:#16a34a}.err{color:#dc2626}
+</style>
+</head>
+<body>
+<div class="box">
+<div class="tabs">
+<button id="tabCalc" onclick="setMode('calc')">練習</button>
+<button id="tabExam" class="ghost" onclick="setMode('exam')">測驗</button>
+</div>
+<h1 id="title">直式除法計數機</h1>
+<div id="calcControls">
+<div class="row">
+<label>被除數 <input type="number" id="dividend" value="735" min="0" max="9999" step="any"></label>
+<label>除數 <input type="number" id="divisor" value="3" min="1" max="99" step="1"></label>
+</div>
+<div class="row">
+<button onclick="make()">產生直式</button>
+<button onclick="showHint()">提示</button>
+<button class="ghost" onclick="fillAns()">顯示答案</button>
+<button class="ghost" onclick="clearVal()">重做</button>
+</div>
+</div>
+<div id="examControls" style="display:none">
+<div class="row">
+<label>被除數 <select id="dDigits"><option value="2">2位</option><option value="3" selected>3位</option><option value="4">4位</option></select></label>
+<label>除數 <select id="vDigits"><option value="1" selected>1位</option><option value="2">2位</option></select></label>
+<label>題數 <select id="qNum"><option value="5" selected>5題</option><option value="10">10題</option><option value="20">20題</option></select></label>
+<button onclick="startExam()">開始測驗</button>
+</div>
+<div class="scorebar"><span class="pill" id="qpill">未開始</span><span class="pill" id="spill">分數 0</span></div>
+<div class="row">
+<button onclick="showHint()">提示</button>
+<button id="nextBtn" onclick="nextQ()">下一題 →</button>
+<button class="ghost" onclick="startExam()">重新出卷</button>
+</div>
+</div>
+<div class="msg" id="msg">輸入數字後按「產生直式」</div>
+<div class="hint">
+<div id="grid"></div>
+<div><div id="mwrap"><b id="mtitle"></b><table id="mtab"></table><div id="suggest"></div></div></div>
+</div>
+</div>
+<script>
+let cells=[],orderList=[],curTotal=0,curDv=0,curDs=0;
+let mode='calc',qIdx=0,qTotal=0,score=0,locked=false;
+function setMode(m){
+  mode=m;
+  document.getElementById('tabCalc').className=m==='calc'?'':'ghost';
+  document.getElementById('tabExam').className=m==='exam'?'':'ghost';
+  document.getElementById('calcControls').style.display=m==='calc'?'':'none';
+  document.getElementById('examControls').style.display=m==='exam'?'':'none';
+  document.getElementById('title').textContent=m==='calc'?'直式除法計數機':'直式除法測驗';
+  document.title=m==='calc'?'直式除法計數機':'直式除法測驗';
+  cells=[];document.getElementById('grid').innerHTML='';
+  document.getElementById('mwrap').classList.remove('show');
+  document.getElementById('nextBtn').classList.remove('show');
+  const msg=document.getElementById('msg');
+  if(m==='calc'){make();}
+  else{qIdx=0;qTotal=0;score=0;locked=false;updBar();msg.textContent='揀好設定，按「開始測驗」隨機出題';msg.className='msg';}
+}
+function gen(dividend,divisor){
+  const raw=String(dividend),sD=raw.replace('.',''),sV=String(divisor);
+  const dLen=sV.length,bCol=dLen,dStart=dLen+1;
+  const pt=raw.indexOf('.');
+  const colOf=i=>dStart+i+(pt>=0&&i>=pt?1:0);
+  cells=[];let r=0;let tmp=0,qStr="";const steps=[];
+  for(let i=0;i<sD.length;i++){
+    const d=+sD[i];tmp=tmp*10+d;
+    const q=Math.floor(tmp/divisor),prod=q*divisor,rem=tmp-prod;
+    qStr+=q;
+    const lead=(qStr.length===1&&q===0&&sD.length>1)||(qStr.replace(/^0+/,'').length===0&&i<sD.length-1);
+    steps.push({q,prod,rem,i,lead});tmp=rem;
+  }
+  steps.forEach((s,idx)=>{cells.push({id:'q-'+idx,row:0,col:colOf(s.i),value:'',exp:String(s.q),in:!s.lead,ph:s.lead,g:'q'});});
+  if(pt>=0)cells.push({id:'qp',row:0,col:dStart+pt,value:'.',exp:'.',in:false});
+  r=1;
+  for(let i=0;i<dLen;i++)cells.push({id:'dv'+i,row:1,col:i,value:sV[i],exp:sV[i],in:false});
+  cells.push({id:'br',row:1,col:bCol,value:')',exp:')',in:false,dec:'bracket'});
+  for(let i=0;i<raw.length;i++)cells.push({id:'dd'+i,row:1,col:dStart+i,value:raw[i],exp:raw[i],in:false,top:1});
+  r=2;
+  steps.forEach((s,idx)=>{
+    if(s.lead)return;
+    if(s.q!==0){
+      const sp=String(s.prod);
+      for(let j=0;j<sp.length;j++)cells.push({id:`p${idx}-${j}`,row:r,col:(colOf(s.i))-(sp.length-1)+j,value:'',exp:sp[j],in:true,g:'p',ul:1});
+      r++;
+      if(idx<steps.length-1){
+        if(s.rem!==0){const sr=String(s.rem);for(let k=0;k<sr.length;k++)cells.push({id:`r${idx}-${k}`,row:r,col:(colOf(s.i))-(sr.length-1)+k,value:'',exp:sr[k],in:true,g:'r'});}
+        cells.push({id:'b'+idx,row:r,col:colOf(idx+1),value:'',exp:sD[idx+1],in:false,g:'d',auto:true,just:false});
+      }else if(s.rem!==0){const sr=String(s.rem);for(let k=0;k<sr.length;k++)cells.push({id:`f-${k}`,row:r,col:(colOf(s.i))-(sr.length-1)+k,value:'',exp:sr[k],in:true,g:'r'});}
+      r++;
+    }else{
+      cells.push({id:`p${idx}-0`,row:r,col:colOf(s.i),value:'',exp:'0',in:true,g:'p',ul:1});
+      r++;
+      const sr0=String(s.rem);if(s.rem!==0)for(let k=0;k<sr0.length;k++)cells.push({id:`r${idx}-${k}`,row:r,col:(colOf(s.i))-(sr0.length-1)+k,value:'',exp:sr0[k],in:true,g:'r'});
+      if(idx<steps.length-1)cells.push({id:'b'+idx,row:r,col:colOf(idx+1),value:'',exp:sD[idx+1],in:false,g:'d',auto:true,just:false});
+      r++;
+    }
+  });
+  let n=0;
+  for(let i=0;i<sD.length;i++){
+    const q=cells.find(c=>c.id==='q-'+i);if(q&&q.in)q.ord=n++;
+    cells.filter(c=>c.id.indexOf('p'+i+'-')===0).sort((a,b)=>a.col-b.col).forEach(c=>{c.ord=n++;});
+    let rc=cells.filter(c=>c.id.indexOf('r'+i+'-')===0);
+    if(i===sD.length-1)rc=cells.filter(c=>c.id.indexOf('f-')===0);
+    rc.sort((a,b)=>a.col-b.col).forEach(c=>{c.ord=n++;});
+    const b=cells.find(c=>c.id==='b'+i);if(b&&b.in)b.ord=n++;
+  }
+  return dStart+raw.length;
+}
+function make(){
+  const dv=+document.getElementById('dividend').value, ds=+document.getElementById('divisor').value;
+  const msg=document.getElementById('msg');
+  if(!dv||!ds||ds<1||dv<=0){msg.textContent='除數同被除數都要係正數';msg.className='msg err';return;}
+  if(!Number.isInteger(ds)){msg.textContent='除數只可以係整數';msg.className='msg err';return;}
+  if(!/^\d{1,4}(\.\d{1,2})?$/.test(String(dv))){msg.textContent='被除數最多4位整數加2位小數';msg.className='msg err';return;}
+  if(dv>9999||ds>99){msg.textContent='暫只支援 被除數≤9999、除數≤99';msg.className='msg err';return;}
+  curDv=dv;curDs=ds;locked=false;
+  curTotal=gen(dv,ds);render(curTotal,dv,ds);
+  document.getElementById('mwrap').classList.remove('show');
+  msg.textContent='';msg.className='msg';
+}
+function activeId(){
+  const ins=cells.filter(c=>c.in&&c.value!==c.exp).sort((a,b)=>a.ord-b.ord);
+  return ins.length?ins[0].id:null;
+}
+function render(total,dv,ds){
+  const g=document.getElementById('grid');g.innerHTML='';
+  const dLen=String(ds).length;
+  g.style.gridTemplateColumns=`repeat(${dLen},40px) 24px repeat(${total-dLen-1},40px)`;
+  cells.forEach(c=>{
+    const d=document.createElement('div');
+    d.className='cell'+(c.col===dLen?' bcol':'')+(c.top?' top':'')+(c.ul?' uline':'');
+    d.style.gridColumn=(c.col+1);d.style.gridRow=(c.row+1);
+    if(c.dec==='bracket'){d.innerHTML='<svg width="24" height="50" viewBox="0 0 24 50"><path d="M24 0 L8 0 Q24 25 8 50" fill="none" stroke="#0f172a" stroke-width="2.5"/></svg>';}
+    else if(c.in){
+      const inp=document.createElement('input');
+      inp.className='digit';inp.maxLength=1;inp.value=c.value;inp.dataset.id=c.id;
+      if(mode==='exam'&&locked)inp.disabled=true;
+      const ok=c.value!==''&&c.value===c.exp, bad=c.value!==''&&c.value!==c.exp;
+      if(ok)inp.classList.add('ok');if(bad)inp.classList.add('bad');
+      inp.oninput=e=>{const v=e.target.value;if(!/^\d?$/.test(v)){e.target.value='';return;}c.value=v;check(curTotal,curDv,curDs);};
+      d.appendChild(inp);
+    }else if(c.auto){
+      if(c.value!==''){const s=document.createElement('span');s.textContent=c.value;if(c.just){s.className='drop';c.just=false;}d.appendChild(s);}
+      else{d.classList.add('bauto');}
+    }else{d.textContent=c.value;}
+    g.appendChild(d);
+  });
+  document.getElementById('mtitle').textContent=ds+' 的乘法表';
+  let h='';for(let i=1;i<=9;i++)h+=`<tr><td>${ds}×${i}</td><td>=</td><td>${ds*i}</td></tr>`;
+  document.getElementById('mtab').innerHTML=h;
+}
+function showHint(){
+  const ds=curDs;
+  const act=cells.find(c=>c.id===activeId());
+  const tip=document.getElementById('suggest');
+  let n=null;
+  if(act){
+    if(act.g==='q')n=parseInt(act.exp);
+    else if(act.id.indexOf('b')===0){const q=cells.find(c=>c.id==='q-'+(+act.id.slice(1)+1));if(q)n=parseInt(q.exp);}
+    else{const m=act.id.match(/^(?:p|r)(\d+)-/);if(m){const q=cells.find(c=>c.id==='q-'+m[1]);if(q)n=parseInt(q.exp);}else n=parseInt((cells.find(c=>c.id==='q-0')||{exp:'0'}).exp);}
+  }
+  let h='';for(let i=1;i<=9;i++)h+=`<tr class="${i===n?'hl':''}"><td>${ds}×${i}</td><td>=</td><td>${ds*i}</td></tr>`;
+  document.getElementById('mtitle').textContent=ds+' 的乘法表';
+  document.getElementById('mtab').innerHTML=h;
+  document.getElementById('mwrap').classList.add('show');
+  if(n===null)tip.textContent='';
+  else if(n===0)tip.textContent='提示：呢格商係 0，直接填 0，再拉下一個位';
+  else tip.textContent=`提示：試下 ${ds} × ${n} = ${ds*n}，係最接近又唔超過上面個數嘅答案`;
+}
+function tryAutoBring(){
+  let filled=false;
+  cells.filter(c=>c.auto&&c.value!==c.exp).forEach(b=>{
+    const idx=+b.id.slice(1);
+    const need=cells.filter(c=>c.in&&(c.id==='q-'+idx||c.id.indexOf('p'+idx+'-')===0||c.id.indexOf('r'+idx+'-')===0));
+    if(need.length&&need.every(c=>c.value===c.exp&&c.value!=='')){b.value=b.exp;b.just=true;filled=true;}
+  });
+  return filled;
+}
+function check(total,dv,ds){
+  if(mode==='exam'&&locked)return;
+  tryAutoBring();
+  const done=cells.every(c=>!c.in||c.value===c.exp);
+  const msg=document.getElementById('msg');
+  if(done){
+    if(mode==='calc'){
+      const dec=(String(dv).split('.')[1]||'').length,qq=Math.floor(dv/ds);
+      msg.textContent='🎉 答啱晒！'+dv+' ÷ '+ds+' = '+qq+' 餘 '+ +((dv-qq*ds).toFixed(dec));msg.className='msg okmsg';
+    }else{
+      locked=true;score+=10;updBar();
+      msg.textContent='🎉 答啱晒！'+dv+' ÷ '+ds+' = '+Math.floor(dv/ds)+' 餘 '+dv%ds+'（+10分）';
+      msg.className='msg okmsg';
+      document.getElementById('nextBtn').classList.add('show');
+      document.getElementById('nextBtn').textContent=qIdx<qTotal?'下一題 →':'查看成績';
+    }
+  }
+  render(total,dv,ds);
+}
+function fillAns(){cells.forEach(c=>{if(c.in||c.auto){c.value=c.exp;c.just=false;}});render(curTotal,curDv,curDs);document.getElementById('msg').textContent='已顯示答案';document.getElementById('msg').className='msg';}
+function clearVal(){cells.forEach(c=>{if(c.in||c.auto){c.value='';c.just=false;}});render(curTotal,curDv,curDs);document.getElementById('msg').textContent='';document.getElementById('msg').className='msg';}
+function rnd(lo,hi){return Math.floor(Math.random()*(hi-lo+1))+lo;}
+function newRandom(){
+  const dd=+document.getElementById('dDigits').value, vd=+document.getElementById('vDigits').value;
+  const dLo=Math.pow(10,dd-1),dHi=Math.pow(10,dd)-1;
+  const vLo=vd===1?2:10,vHi=vd===1?9:99;
+  let dv=rnd(dLo,dHi),ds=rnd(vLo,vHi);
+  if(dv<ds)dv=ds*rnd(2,9);
+  if(dv>dHi)dv=dHi;
+  return [dv,ds];
+}
+function startExam(){
+  qTotal=+document.getElementById('qNum').value;
+  qIdx=0;score=0;updBar();
+  nextQ();
+}
+function nextQ(){
+  if(qIdx>=qTotal){
+    document.getElementById('msg').textContent='🎉 測驗完成！總分 '+score+' / '+(qTotal*10);
+    document.getElementById('msg').className='msg okmsg';
+    document.getElementById('nextBtn').classList.remove('show');
+    return;
+  }
+  qIdx++;locked=false;
+  [curDv,curDs]=newRandom();
+  curTotal=gen(curDv,curDs);
+  document.getElementById('mwrap').classList.remove('show');
+  document.getElementById('nextBtn').classList.remove('show');
+  updBar();
+  const msg=document.getElementById('msg');
+  msg.textContent='第 '+qIdx+' / '+qTotal+' 題：'+curDv+' ÷ '+curDs+'，自己諗下填邊格';
+  msg.className='msg';
+  render(curTotal,curDv,curDs);
+}
+function updBar(){
+  document.getElementById('qpill').textContent=qTotal?('第 '+Math.min(qIdx,qTotal)+' / '+qTotal+' 題'):'未開始';
+  document.getElementById('spill').textContent='分數 '+score;
+}
+make();
+</script>
+</body>
+</html>
